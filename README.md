@@ -113,9 +113,10 @@ Config is stored in `~/.smart_scribe.json` (auto-created on calibrate):
 
 ```json
 {
-  "silence_threshold": 12.0,
-  "silence_duration": 1.2,
-  "min_recording_duration": 0.8,
+  "input_device": 0,
+  "silence_threshold": 0.05,
+  "silence_duration": 1.5,
+  "min_recording_duration": 1.0,
   "max_duration": 45.0,
   "language_code": "en"
 }
