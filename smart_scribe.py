@@ -23,9 +23,10 @@ Config & persistence:
 
     - Behavior config in ~/.smart_scribe.json (auto-created on calibrate):
         {
-          "silence_threshold": 12.0,
-          "silence_duration": 1.2,
-          "min_recording_duration": 0.8,
+          "input_device": 0,
+          "silence_threshold": 0.05,
+          "silence_duration": 1.5,
+          "min_recording_duration": 1.0,
           "max_duration": 45.0,
           "language_code": "en"
         }
@@ -48,6 +49,9 @@ import time
 import wave
 from pathlib import Path
 
+import warnings
+warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
+
 import numpy as np
 import sounddevice as sd
 import requests
@@ -62,7 +66,7 @@ API_KEY_PATH = Path.home() / ".smart_scribe_key"
 DEFAULT_SAMPLE_RATE = 16000
 DEFAULT_BLOCK_SIZE = 800              # 50ms chunks at 16kHz
 
-DEFAULT_SILENCE_THRESHOLD = 12.0      # RMS-ish level, use --calibrate to tune
+DEFAULT_SILENCE_THRESHOLD = 0.05      # RMS level, use --calibrate to tune
 DEFAULT_SILENCE_DURATION = 1.2        # Seconds of silence to trigger stop
 DEFAULT_MIN_RECORDING_DURATION = 0.8  # Ignore very short bursts
 DEFAULT_MAX_DURATION = 45.0           # Hard failsafe
@@ -130,6 +134,7 @@ def load_api_key():
 
 SAMPLE_RATE = int(CONFIG.get("sample_rate", DEFAULT_SAMPLE_RATE))
 BLOCK_SIZE = int(CONFIG.get("block_size", DEFAULT_BLOCK_SIZE))
+INPUT_DEVICE = CONFIG.get("input_device", None)  # None = system default, or device index/name
 
 SILENCE_THRESHOLD = float(CONFIG.get("silence_threshold", DEFAULT_SILENCE_THRESHOLD))
 SILENCE_DURATION = env_float(
@@ -268,6 +273,7 @@ def calibrate_threshold(seconds=3):
             samplerate=SAMPLE_RATE,
             channels=1,
             blocksize=BLOCK_SIZE,
+            device=INPUT_DEVICE,
         ) as stream:
             for _ in range(num_blocks):
                 data, _ = stream.read(BLOCK_SIZE)
@@ -286,7 +292,7 @@ def calibrate_threshold(seconds=3):
 
     ambient = float(np.percentile(samples, 90))  # 90th percentile of "silence"
     suggested = ambient * 2.5                    # Speech ~2.5x ambient
-    suggested = max(suggested, 6.0)              # Floor to avoid hypersensitivity
+    suggested = max(suggested, 0.03)             # Floor to avoid hypersensitivity
 
     save_config({"silence_threshold": suggested})
 
@@ -323,6 +329,7 @@ def record_until_silence():
             channels=1,
             callback=audio_callback,
             blocksize=BLOCK_SIZE,
+            device=INPUT_DEVICE,
         ):
             last_audio_time = time.time()
 
